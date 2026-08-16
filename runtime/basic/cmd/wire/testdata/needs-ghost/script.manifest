@@ -1,0 +1,7 @@
+name = "needs-ghost"
+version = "0.1.0"
+core = "ghost"
+coreApi = 1
+link = "stdio"
+cmd = ["python", "main.py"]
+capabilities = []

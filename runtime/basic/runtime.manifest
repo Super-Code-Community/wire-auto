@@ -1,0 +1,5 @@
+name = "wire-auto-runtime"
+version = "0.1.0"
+protocols = [1]
+transports = ["stdio"]
+cores = ["regular"]
