@@ -1,0 +1,8 @@
+name = "needs-serial"
+version = "0.1.0"
+core = "regular"
+coreApi = 1
+link = "stdio"
+cmd = ["python", "main.py"]
+language = "python"
+capabilities = ["serial"]

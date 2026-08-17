@@ -1,0 +1,53 @@
+# ---- IDE / editors ----
+.idea/
+.vscode/
+*.swp
+*~
+
+# ---- OS ----
+.DS_Store
+Thumbs.db
+
+# ---- Claude Code (local, per-machine) ----
+.claude/settings.local.json
+
+# ---- Node / JS / TS ----
+node_modules/
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+.pnp.*
+.turbo/
+
+# ---- Go ----
+bin/
+*.exe
+*.test
+*.out
+vendor/
+# go.work is a local, per-machine dev convenience — never committed (see CLAUDE.md)
+go.work
+go.work.sum
+
+# ---- Rust (if any bridge uses it) ----
+target/
+
+# ---- Python (scripts / tooling) ----
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+
+# ---- Env / secrets ----
+.env
+.env.*
+!.env.example
+
+# ---- Logs / temp ----
+*.log
+tmp/
+.cache/
+
