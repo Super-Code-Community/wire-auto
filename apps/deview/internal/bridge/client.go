@@ -34,7 +34,7 @@ func (c *Client) Run(dir string, onEvent func(Event)) (Event, error) {
 			return Event{}, err
 		}
 		switch e.Type {
-		case "ready", "log":
+		case "ready", "log", "prompt":
 			if onEvent != nil {
 				onEvent(e)
 			}
@@ -46,6 +46,11 @@ func (c *Client) Run(dir string, onEvent func(Event)) (Event, error) {
 
 // Cancel просит мост отменить текущий прогон.
 func (c *Client) Cancel() error { return c.t.Send(Command{Type: "cancel"}) }
+
+// SendInput отвечает на prompt скрипта строкой value (коррелируется по id).
+func (c *Client) SendInput(id, value string) error {
+	return c.t.Send(Command{Type: "input", ID: id, Value: value})
+}
 
 // Close завершает мост и освобождает ресурсы транспорта.
 func (c *Client) Close() error { return c.t.Close() }

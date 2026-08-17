@@ -1,0 +1,8 @@
+name = "ask-name"
+version = "0.1.0"
+core = "duplex"
+coreApi = 1
+capabilities = []
+link = "stdio"
+language = "python"
+cmd = ["python", "main.py"]

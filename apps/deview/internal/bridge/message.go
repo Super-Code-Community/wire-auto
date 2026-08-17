@@ -11,8 +11,10 @@ import (
 const maxLineBytes = 1 << 20
 
 type Command struct {
-	Type string `json:"type"`
-	Dir  string `json:"dir,omitempty"`
+	Type  string `json:"type"`
+	Dir   string `json:"dir,omitempty"`
+	ID    string `json:"id,omitempty"`
+	Value string `json:"value,omitempty"`
 }
 
 type Script struct {
@@ -25,6 +27,7 @@ type Script struct {
 
 type Event struct {
 	Type         string          `json:"type"`
+	ID           string          `json:"id,omitempty"`
 	Scripts      []Script        `json:"scripts,omitempty"`
 	Level        string          `json:"level,omitempty"`
 	Message      string          `json:"message,omitempty"`

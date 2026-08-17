@@ -15,7 +15,7 @@
 создайте `go.work` у себя локально:
 
 ```bash
-go work init ./runtime/basic ./apps/deview
+go work init ./cores/regular ./cores/duplex ./apps/deview
 ```
 
 Он получится примерно таким (но останется только у вас, вне git):
@@ -24,76 +24,35 @@ go work init ./runtime/basic ./apps/deview
 // go.work  (локально, не в репозитории)
 go 1.26.4
 
-use ./runtime/basic
+use ./cores/regular
+use ./cores/duplex
 use ./apps/deview
 ```
 
 Без `go.work` каждый модуль собирается сам по себе — заходите в его папку
-(`cd runtime/basic`, `cd apps/deview`) и работаете там. См. «Команды сборки» ниже.
+(`cd cores/regular`, `cd apps/deview`) и работаете там. См. «Команды сборки» ниже.
 
-## runtime/ — контейнер рантайм-моделей
+## cores/ — контейнер ядер-бандлов
 
-Каждая рантайм-модель — отдельный Go-модуль в `runtime/<модель>/`:
-
-```
-runtime/
-└── basic/            module: wire-auto/runtime/basic
-    ├── go.mod
-    ├── cmd/wire/     точка входа — команда wire
-    └── internal/     manifest, handshake, registry, exec, protocol
-```
-
-Сейчас одна модель — `runtime/basic`. Будущие модели (например, `runtime/cloud`)
-появятся рядом как самостоятельные модули.
-
-## cores/ — контейнер ядер
-
-Каждое ядро — папка `cores/<ядро>/` с `core.manifest` и SDK-шимами под языки:
+Каждое ядро — самодостаточный Go-модуль в `cores/<имя>/`:
 
 ```
 cores/
-└── regular/
-    ├── core.manifest       паспорт ядра (TOML)
-    └── sdk/
-        └── python/
-            ├── wire.py        тонкий шим (~30 строк)
-            └── wire_test.py   юнит-тест шима
+├── regular/          module: wire-auto/cores/regular
+│   ├── go.mod
+│   ├── core.manifest
+│   ├── cmd/core/     точка входа — стриминговый мост app↔core
+│   └── internal/     встроенная рантайм-библиотека
+└── duplex/           module: wire-auto/cores/duplex
+    ├── go.mod
+    ├── core.manifest
+    ├── cmd/core/     точка входа — одиночный запуск (-script <dir>)
+    └── internal/     встроенная рантайм-библиотека
 ```
 
-Ядро **не является** Go-модулем — это просто папка с манифестом и языковыми шимами.
-
-## Команды сборки и тестирования
-
-Все команды запускаются из корня репозитория `wire-auto/` (если не оговорено иное).
-
-**Быстрый smoke моста** (список скриптов и выход):
-```bash
-printf '%s\n' '{"type":"list"}' '{"type":"exit"}' | go run ./runtime/basic/cmd/wire
-```
-
-`wire` — долгоживущий мост, а не разовая команда; для интерактивного запуска
-скриптов используйте клиент `deview` (`go run ./apps/deview/cmd/deview`).
-Подробнее — в [running.md](running.md) и [apps-deview.md](apps-deview.md).
-
-**Go-тесты рантайма:**
-```bash
-go test wire-auto/runtime/basic/...
-# или эквивалентно из папки модуля:
-cd runtime/basic && go test ./...
-```
-
-**Сборка и проверка:**
-```bash
-go build wire-auto/runtime/basic/...
-go vet   wire-auto/runtime/basic/...
-```
-
-**Юнит-тест Python-шима:**
-```bash
-python cores/regular/sdk/python/wire_test.py
-```
-
-> Команда `python3` в среде проекта **не используется** — только `python`.
+Каждый бандл — самодостаточный Go-модуль со своей точкой входа `cmd/core`.
+Рантайм встроен в бандл как библиотека (`internal/`), а не запускается отдельным процессом.
+Будущие ядра (например, `cores/cloud`) добавятся рядом как самостоятельные модули.
 
 ## scripts/ — сами скрипты
 
@@ -106,4 +65,41 @@ scripts/
 ```
 
 Скрипты изолированы — обращаются к ядру только через публичный SDK/протокол,
-не через внутренности `cores/` или `runtime/`.
+не через внутренности `cores/`.
+
+## Команды сборки и тестирования
+
+Все команды запускаются из папки нужного модуля (если не оговорено иное).
+
+**Быстрый smoke моста** (список скриптов и выход):
+```bash
+printf '%s\n' '{"type":"list"}' '{"type":"exit"}' | go run ./cores/regular/cmd/core
+```
+
+`core` (regular) — долгоживущий мост, а не разовая команда; для интерактивного запуска
+скриптов используйте клиент `deview` (`go run ./apps/deview/cmd/deview`).
+Подробнее — в [running.md](running.md) и [apps-deview.md](apps-deview.md).
+
+**Go-тесты бандла regular:**
+```bash
+# из папки модуля:
+cd cores/regular && go test ./...
+```
+
+**Go-тесты бандла duplex:**
+```bash
+cd cores/duplex && go test ./...
+```
+
+**Сборка и проверка:**
+```bash
+cd cores/regular && go build ./... && go vet ./...
+cd cores/duplex  && go build ./... && go vet ./...
+```
+
+**Юнит-тест Python-шима:**
+```bash
+python cores/regular/sdk/python/wire_test.py
+```
+
+> Команда `python3` в среде проекта **не используется** — только `python`.

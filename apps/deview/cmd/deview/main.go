@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	wireBin := flag.String("wire", "", "path to the wire bridge binary (default: go run ./runtime/basic/cmd/wire)")
+	wireBin := flag.String("wire", "", "path to the wire bridge binary (default: go run ./cores/duplex/cmd/core)")
 	flag.Parse()
 
 	tr, err := startBridge(*wireBin)
@@ -49,13 +49,13 @@ func main() {
 			fmt.Println("Неверный выбор.")
 			continue
 		}
-		runOne(client, scripts[n-1])
+		runOne(client, reader, scripts[n-1])
 	}
 }
 
 // runOne запускает выбранный скрипт и рисует его ход. Ctrl-C во время прогона
-// шлёт cancel мосту (а не убивает deview).
-func runOne(client *bridge.Client, s bridge.Script) {
+// шлёт cancel мосту. На событие prompt печатает запрос и читает строку из stdin.
+func runOne(client *bridge.Client, reader *bufio.Scanner, s bridge.Script) {
 	fmt.Printf("\n▶ %s\n", s.Name)
 
 	sigCh := make(chan os.Signal, 1)
@@ -77,6 +77,13 @@ func runOne(client *bridge.Client, s bridge.Script) {
 			fmt.Println("  ⏳ выполняется…")
 		case "log":
 			fmt.Println(ui.RenderLog(e))
+		case "prompt":
+			fmt.Printf("  ❔ %s ", e.Message)
+			line := ""
+			if reader.Scan() {
+				line = strings.TrimSpace(reader.Text())
+			}
+			_ = client.SendInput(e.ID, line)
 		}
 	})
 	if err != nil {
@@ -97,5 +104,5 @@ func startBridge(wireBin string) (bridge.Transport, error) {
 		return bridge.NewProcessTransport(env)
 	}
 	// dev-умолчание: запускать из корня репозитория.
-	return bridge.NewProcessTransport("go", "run", "./runtime/basic/cmd/wire")
+	return bridge.NewProcessTransport("go", "run", "./cores/duplex/cmd/core")
 }

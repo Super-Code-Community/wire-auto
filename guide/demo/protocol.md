@@ -21,23 +21,23 @@
 
 **Скрипт не должен делать `print()` / запись в stdout напрямую.**
 stdout — исключительно для протокольных сообщений JSON Lines.
-Хочешь вывести текст — шли сообщение `log`. Голый `print` сломает парсер рантайма.
+Хочешь вывести текст — шли сообщение `log`. Голый `print` сломает парсер бандла.
 
 stderr — не трогается протоколом; используется для сырой диагностики самого шима.
 
 ## Набор сообщений v1
 
-| Направление      | `type`     | Назначение                                                  |
-|------------------|------------|-------------------------------------------------------------|
-| runtime → script | `hello`    | Старт сеанса: конфиг, сведённые версии, аргументы           |
-| script → runtime | `ready`    | Шим поднялся, скрипт готов работать                         |
-| script → runtime | `log`      | Строка вывода для клиента (поля: `level`, `message`)        |
-| script → runtime | `done`     | Завершение: `exitCode`, опционально `result`                |
-| runtime → script | `cancel`   | Просьба завершиться (по таймауту или запросу клиента)       |
+| Направление    | `type`     | Назначение                                                  |
+|----------------|------------|-------------------------------------------------------------|
+| core → script  | `hello`    | Старт сеанса: конфиг, сведённые версии, аргументы           |
+| script → core  | `ready`    | Шим поднялся, скрипт готов работать                         |
+| script → core  | `log`      | Строка вывода для клиента (поля: `level`, `message`)        |
+| script → core  | `done`     | Завершение: `exitCode`, опционально `result`                |
+| core → script  | `cancel`   | Просьба завершиться (по таймауту или запросу клиента)       |
 
 ## Описание сообщений
 
-### hello (runtime → script)
+### hello (core → script)
 ```json
 {"type":"hello","protocol":1,"coreApi":1,"args":[]}
 ```
@@ -45,20 +45,20 @@ stderr — не трогается протоколом; используетс�
 - `coreApi` — согласованная версия Core API
 - `args` — аргументы запуска (передаются скрипту)
 
-### ready (script → runtime)
+### ready (script → core)
 ```json
 {"type":"ready"}
 ```
 Шим успешно прочитал `hello` и готов. Должен прийти до истечения `startupTimeout` (10 с).
 
-### log (script → runtime)
+### log (script → core)
 ```json
 {"type":"log","level":"info","message":"hello from python"}
 ```
 - `level` — уровень (`info`, `warn`, `error`)
 - `message` — текст строки
 
-### done (script → runtime)
+### done (script → core)
 ```json
 {"type":"done","exitCode":0}
 ```
@@ -68,27 +68,32 @@ stderr — не трогается протоколом; используетс�
 ```
 - `exitCode` — код завершения (`0` = успех, иное = ошибка скрипта)
 
-### cancel (runtime → script)
+### cancel (core → script)
 ```json
 {"type":"cancel"}
 ```
-Просьба скрипту завершиться. После `cancel` рантайм ждёт `CancelGrace` (2 с),
+Просьба скрипту завершиться. После `cancel` бандл ждёт `CancelGrace` (2 с),
 затем принудительно завершает процесс. Подробнее — в [lifecycle.md](lifecycle.md).
 
 ## Пример полного диалога
 
 ```
-runtime → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
-script  → {"type":"ready"}
-script  → {"type":"log","level":"info","message":"hello from python"}
-script  → {"type":"done","exitCode":0}
+core   → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
+script → {"type":"ready"}
+script → {"type":"log","level":"info","message":"hello from python"}
+script → {"type":"done","exitCode":0}
 ```
 
-## Зарезервированные типы: request / response
+## Интерактивный ввод: prompt / input / response
+
+- `prompt` (скрипт→ядро) — запрос строки ввода у человека; ответ приходит как
+  `response` с тем же `id` и `result.value`. Подробнее — [prompts.md](prompts.md).
+
+## Зарезервированные типы: request / response (будущее)
 
 `request` и `response` зарезервированы для будущей возможности «запрос к железу»
-(hardware bridge). В v1 **не используются**:
-- `core.provides = []` — у ядра нет возможностей
-- Любой `request` от скрипта при `provides = []` → ядро фиксирует **`PROTOCOL_VIOLATION`**
+(hardware bridge). В v1 **не используются** для capabilities:
+- Возможности (`capabilities`) в v1 пусты
+- Любой `request` от скрипта при отсутствии разрешённых capabilities → бандл фиксирует **`PROTOCOL_VIOLATION`**
 
 Подробнее о статусах результата — в [lifecycle.md](lifecycle.md).

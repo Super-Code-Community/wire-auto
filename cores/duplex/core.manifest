@@ -1,0 +1,5 @@
+name = "duplex"
+version = "0.1.0"
+coreApi = 1
+protocol = 2
+links = ["stdio"]

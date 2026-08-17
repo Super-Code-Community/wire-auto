@@ -1,0 +1,8 @@
+name = "env-report-node"
+version = "0.1.0"
+core = "duplex"
+coreApi = 1
+capabilities = ["env.get"]
+link = "stdio"
+language = "node"
+cmd = ["node", "main.js"]
