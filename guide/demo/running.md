@@ -4,14 +4,14 @@
 
 ## Запуск скрипта через deview
 
-`wire` — долгоживущий мост (stdin → команды, stdout → события); напрямую руками
+`core` (regular) — долгоживущий мост (stdin → команды, stdout → события); напрямую руками
 его не запускают. Для интерактивного запуска скриптов используйте `deview`:
 
 ```bash
 go run ./apps/deview/cmd/deview
 ```
 
-`deview` сам поднимает мост, показывает нумерованное меню и рисует живой ход
+`deview` сам поднимает бандл ядра, показывает нумерованное меню и рисует живой ход
 выполнения. Подробнее — в [apps-deview.md](apps-deview.md).
 
 ### Запуск через пайп (отладка / скрипты)
@@ -19,37 +19,34 @@ go run ./apps/deview/cmd/deview
 Можно передавать команды напрямую, подавая JSON Lines в stdin:
 
 ```bash
-printf '%s\n' '{"type":"list"}' '{"type":"exit"}' | go run ./runtime/basic/cmd/wire
+printf '%s\n' '{"type":"list"}' '{"type":"exit"}' | go run ./cores/regular/cmd/core
 ```
 
-Мост читает команды до `exit` или EOF и закрывается. Это удобно для автоматизации
+Бандл читает команды до `exit` или EOF и закрывается. Это удобно для автоматизации
 и диагностики; для повседневной работы предпочтительнее `deview`.
 
-### Флаги wire
+### Флаги core (regular)
 
-| Флаг        | По умолчанию                     | Назначение                       |
-|-------------|----------------------------------|----------------------------------|
-| `--runtime` | `runtime/basic/runtime.manifest` | путь к манифесту рантайма        |
-| `--cores`   | `cores`                          | путь к директории с ядрами       |
-| `--scripts` | `scripts`                        | корень поиска скриптов           |
+| Флаг        | По умолчанию | Назначение                       |
+|-------------|--------------|----------------------------------|
+| `--cores`   | `cores`      | путь к директории с ядрами       |
+| `--scripts` | `scripts`    | корень поиска скриптов           |
 
-Протокол команд/событий — в [app-runtime-bridge.md](app-runtime-bridge.md).
+Протокол команд/событий — в [app-core-bridge.md](app-core-bridge.md).
 
-## Go-тесты рантайма
+## Go-тесты бандлов
 
 ```bash
-# из корня репозитория (через go.work)
-go test wire-auto/runtime/basic/...
-
-# или из папки модуля
-cd runtime/basic && go test ./...
+# из папки модуля:
+cd cores/regular && go test ./...
+cd cores/duplex  && go test ./...
 ```
 
 ## Сборка и проверка (vet)
 
 ```bash
-go build wire-auto/runtime/basic/...
-go vet   wire-auto/runtime/basic/...
+cd cores/regular && go build ./... && go vet ./...
+cd cores/duplex  && go build ./... && go vet ./...
 ```
 
 ## Тест Python-шима

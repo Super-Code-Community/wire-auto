@@ -8,17 +8,17 @@ Discover → Route → Handshake → Spawn → Hello → Pump → Result
 
 ### 1. Discover — чтение манифестов
 
-Рантайм загружает `runtime.manifest`, сканирует `cores/*/core.manifest` и строит
-реестр допущенных ядер. Затем читает `script.manifest` из указанной папки скрипта.
+Бандл читает `script.manifest` из указанной папки скрипта и свой `core.manifest`.
+Нет отдельного рантайм-манифеста — рантайм встроен в бандл как библиотека.
 
 ### 2. Route — маршрутизация по ядру
 
-Скрипт маршрутизируется на допущенное ядро по полю `script.core`.
-Провал: `UNKNOWN_CORE` или `CORE_INCOMPATIBLE`. Подробнее — в [cores-and-runtimes.md](cores-and-runtimes.md).
+Скрипт маршрутизируется на ядро по полю `script.core`.
+Провал: `UNKNOWN_CORE` или `CORE_INCOMPATIBLE`. Подробнее — в [cores.md](cores.md).
 
-### 3. Handshake — сведение трёх манифестов
+### 3. Handshake — сведение двух манифестов
 
-Проверяется совместимость `coreApi`, `capabilities`, `protocol`, `link`.
+Проверяется совместимость `coreApi`, `capabilities`, `link`.
 Провал: `HANDSHAKE_FAILED` + конкретный код. Подробнее — в [handshake.md](handshake.md).
 
 Если все проверки пройдены — формируется `reconciled` (согласованные версии), и
@@ -26,7 +26,7 @@ Discover → Route → Handshake → Spawn → Hello → Pump → Result
 
 ### 4. Spawn — запуск процесса
 
-Рантайм запускает `cmd` из `script.manifest`:
+Бандл запускает `cmd` из `script.manifest`:
 - Рабочая директория: папка скрипта
 - stdin/stdout: труба протокола (JSON Lines)
 - stderr: не перехватывается (сырая диагностика шима)
@@ -34,10 +34,10 @@ Discover → Route → Handshake → Spawn → Hello → Pump → Result
 
 ### 5. Hello — установка сеанса
 
-Рантайм отправляет `hello` и ждёт `ready` от скрипта.
+Бандл отправляет `hello` и ждёт `ready` от скрипта.
 
 ```
-runtime → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
+core → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
 ```
 
 Ожидание ограничено `startupTimeout` = **10 секунд**.
@@ -45,7 +45,7 @@ runtime → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
 
 ### 6. Pump — прокачка сообщений
 
-Рантайм читает поток сообщений от скрипта:
+Бандл читает поток сообщений от скрипта:
 - `log` → передаётся наружу клиенту
 - `done` → завершение сеанса
 - `request` → в v1 фиксируется как **`PROTOCOL_VIOLATION`**
@@ -56,7 +56,7 @@ runtime → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
 
 ### 7. Result — итог
 
-Рантайм возвращает единый результат клиенту (JSON). Процесс завершён.
+Бандл возвращает единый результат клиенту (JSON). Процесс завершён.
 
 ## Таймауты и остановка
 
@@ -69,7 +69,7 @@ runtime → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
 ### Последовательность при таймауте runTimeout
 
 ```
-1. Рантайм отправляет {"type":"cancel"}
+1. Бандл отправляет {"type":"cancel"}
 2. Ждёт CancelGrace (2 с) — даёт скрипту завершиться чисто
 3. Если скрипт не завершился — принудительный kill
 4. Результат: RUN_TIMEOUT
@@ -84,14 +84,14 @@ runtime → {"type":"hello","protocol":1,"coreApi":1,"args":[]}
 | `OK`                 | `done` с `exitCode = 0`                                  |
 | `SCRIPT_ERROR`       | `done` с `exitCode ≠ 0` (ошибка внутри скрипта)         |
 | `HANDSHAKE_FAILED`   | Сведение манифестов не прошло (+ `ErrorCode`)            |
-| `PROTOCOL_VIOLATION` | Битый JSON, неизвестный тип, `request` при `provides=[]` |
+| `PROTOCOL_VIOLATION` | Битый JSON, неизвестный тип, `request` без разрешения    |
 | `STARTUP_TIMEOUT`    | `ready` не получен за 10 с                               |
 | `RUN_TIMEOUT`        | `done` не получен за 60 с                                |
 | `CRASHED`            | Процесс завершился (EOF) без `done`                      |
 
 ## Формат результата (JSON)
 
-Рантайм печатает результат в stdout в формате JSON и завершается с кодом `0` при
+Бандл печатает результат в stdout в формате JSON и завершается с кодом `0` при
 `Status = OK`, иначе — с кодом `1`.
 
 ```json

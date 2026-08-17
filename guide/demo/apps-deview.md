@@ -1,8 +1,8 @@
 # Консольный клиент deview
 
 `deview` — первый клиент платформы wire-auto. Это интерактивный консольный браузер
-скриптов: поднимает мост `wire`, показывает нумерованное меню доступных скриптов,
-запускает выбранный и рисует живой ход выполнения.
+скриптов: поднимает бандл ядра `cores/regular/cmd/core`, показывает нумерованное меню
+доступных скриптов, запускает выбранный и рисует живой ход выполнения.
 
 ## Запуск
 
@@ -10,14 +10,14 @@
 go run ./apps/deview/cmd/deview
 ```
 
-При запуске без флагов deview сам поднимает мост через `go run ./runtime/basic/cmd/wire`
+При запуске без флагов deview сам поднимает бандл через `go run ./cores/regular/cmd/core`
 (dev-умолчание). Для prod-окружения укажите готовый бинарник:
 
 | Способ | Пример |
 |--------|--------|
-| Флаг `--wire` | `go run ./apps/deview/cmd/deview --wire /usr/local/bin/wire` |
-| Переменная `WIRE_BIN` | `WIRE_BIN=/usr/local/bin/wire go run ./apps/deview/cmd/deview` |
-| Dev-умолчание | `go run ./apps/deview/cmd/deview` (запускает `go run ./runtime/basic/cmd/wire`) |
+| Флаг `--wire` | `go run ./apps/deview/cmd/deview --wire /usr/local/bin/core` |
+| Переменная `WIRE_BIN` | `WIRE_BIN=/usr/local/bin/core go run ./apps/deview/cmd/deview` |
+| Dev-умолчание | `go run ./apps/deview/cmd/deview` (запускает `go run ./cores/regular/cmd/core`) |
 
 ## Раскладка модуля
 
@@ -27,7 +27,7 @@ apps/deview/
 │   └── main.go          — REPL-цикл: меню → запуск → результат → меню
 ├── internal/bridge/
 │   ├── message.go       — типы Command/Event/Script, JSON-кодирование
-│   ├── transport.go     — ProcessTransport: поднимает wire как подпроцесс
+│   ├── transport.go     — ProcessTransport: поднимает core как подпроцесс
 │   ├── client.go        — Client: List / Run / Cancel / Close
 │   └── client_test.go   — unit-тесты клиента на фейковом транспорте
 └── internal/ui/
@@ -36,9 +36,9 @@ apps/deview/
     └── render_test.go   — unit-тесты рендеринга
 ```
 
-**`internal/bridge`** — транспортный слой. Знает только протокол app↔runtime:
+**`internal/bridge`** — транспортный слой. Знает только протокол app↔core:
 кодирует команды в JSON Lines, декодирует события из JSON Lines.
-Подробнее о самом протоколе — в [app-runtime-bridge.md](app-runtime-bridge.md).
+Подробнее о самом протоколе — в [app-core-bridge.md](app-core-bridge.md).
 
 **`internal/ui`** — слой отображения. Превращает события в строки для терминала;
 не зависит от транспорта, легко тестируется.
@@ -47,7 +47,7 @@ apps/deview/
 
 ```
 deview стартует
-  └── поднимает мост (wire как подпроцесс)
+  └── поднимает бандл core как подпроцесс
   └── шлёт {"type":"list"} → получает catalog
   └── печатает меню:
         1. hello   (python)
@@ -56,12 +56,12 @@ deview стартует
 
 пользователь вводит "1"
   └── deview шлёт {"type":"run","dir":"scripts/examples/hello"}
-  └── мост отвечает: ready → log* → result
+  └── бандл отвечает: ready → log* → result
   └── deview рисует живой лог и итог
   └── возвращается в меню
 
 пользователь вводит "q"
-  └── deview закрывает мост ({"type":"exit"}) и выходит
+  └── deview закрывает бандл ({"type":"exit"}) и выходит
 ```
 
 ### Ввод пользователя
@@ -70,14 +70,14 @@ deview стартует
 |------|----------|
 | Число (например `1`) | Запустить соответствующий скрипт |
 | `q` / `quit` / `exit` | Завершить deview |
-| Ctrl-C **во время прогона** | Отправить `cancel` мосту (deview не завершается) |
+| Ctrl-C **во время прогона** | Отправить `cancel` бандлу (deview не завершается) |
 | Ctrl-C **в меню** | Завершить deview |
 
 ### Обнаружение скриптов
 
-Мост сканирует каталог скриптов рекурсивно — ищет файл `script.manifest` на любой
+Бандл сканирует каталог скриптов рекурсивно — ищет файл `script.manifest` на любой
 глубине (например `scripts/examples/hello/`). Корень поиска задаётся флагом
-`--scripts` при запуске `wire` (по умолчанию `scripts`).
+`--scripts` при запуске `core` (по умолчанию `scripts`).
 
 ## Go-команды
 

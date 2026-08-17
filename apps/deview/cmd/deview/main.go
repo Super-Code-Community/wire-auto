@@ -17,7 +17,7 @@ import (
 )
 
 func main() {
-	wireBin := flag.String("wire", "", "path to the wire bridge binary (default: go run ./runtime/basic/cmd/wire)")
+	wireBin := flag.String("wire", "", "path to the wire bridge binary (default: go run ./cores/regular/cmd/core)")
 	flag.Parse()
 
 	tr, err := startBridge(*wireBin)
@@ -97,5 +97,5 @@ func startBridge(wireBin string) (bridge.Transport, error) {
 		return bridge.NewProcessTransport(env)
 	}
 	// dev-умолчание: запускать из корня репозитория.
-	return bridge.NewProcessTransport("go", "run", "./runtime/basic/cmd/wire")
+	return bridge.NewProcessTransport("go", "run", "./cores/regular/cmd/core")
 }

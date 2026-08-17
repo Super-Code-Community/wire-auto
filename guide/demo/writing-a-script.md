@@ -11,7 +11,7 @@ scripts/
 ```
 
 Имя папки произвольное. Папка изолирована — скрипт обращается к ядру только через
-SDK/протокол, не через внутренности `cores/` или `runtime/`.
+SDK/протокол, не через внутренности `cores/`.
 
 ### Шаг 2. Написать script.manifest
 
@@ -84,7 +84,7 @@ go run ./apps/deview/cmd/deview
 ```
 
 Причина: `script.coreApi` не совпадает с `core.coreApi` (сейчас `1`).
-Скрипт **не запускается** — рантайм отказывает до спавна.
+Скрипт **не запускается** — бандл отказывает до спавна.
 
 Решение: проверить `coreApi = 1` в `script.manifest`.
 
@@ -94,8 +94,8 @@ go run ./apps/deview/cmd/deview
 {"Status": "HANDSHAKE_FAILED", "ErrorCode": "CAPABILITY_DENIED", ...}
 ```
 
-Причина: в `script.capabilities` указана возможность, которой нет в `core.provides`.
-В v1 `core.provides = []`, поэтому в скрипте тоже должно быть `capabilities = []`.
+Причина: в `script.capabilities` указана возможность, не разрешённая реестром бандла.
+В v1 у ядра нет разрешённых возможностей, поэтому в скрипте тоже должно быть `capabilities = []`.
 
 Решение: убрать всё из `capabilities` в `script.manifest`.
 
@@ -105,7 +105,7 @@ go run ./apps/deview/cmd/deview
 {"Status": "HANDSHAKE_FAILED", "ErrorCode": "UNKNOWN_CORE", ...}
 ```
 
-Причина: в `script.core` указано имя, которого нет среди допущенных ядер.
+Причина: в `script.core` указано имя, которого нет среди известных ядер.
 Скрипт не запускается.
 
 Решение: проверить `core = "regular"` в `script.manifest`.
