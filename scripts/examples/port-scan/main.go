@@ -15,8 +15,11 @@ import (
 
 const (
 	defaultHost = "127.0.0.1"
-	workers     = 1000
-	timeout     = 500 * time.Millisecond
+	// workers держим умеренным: тысячи одновременных полуоткрытых исходящих
+	// соединений (фильтрованные порты удалённого хоста висят до таймаута)
+	// переполняют NAT роутера и эфемерные порты — кладут сеть всей машины.
+	workers = 100
+	timeout = 500 * time.Millisecond
 )
 
 // askPrompt шлёт ядру prompt и синхронно ждёт response по тому же id, возвращая
@@ -53,25 +56,28 @@ func main() {
 		ports = append(ports, p)
 	}
 
-	open := scanPorts(host, ports, workers, timeout)
-
-	for _, p := range open {
+	logf := func(format string, a ...any) {
 		enc.Encode(map[string]any{
 			"type": "log", "level": "info",
-			"message": fmt.Sprintf("port %d OPEN", p),
+			"message": fmt.Sprintf(format, a...),
 		})
 	}
-	enc.Encode(map[string]any{
-		"type": "log", "level": "info",
-		"message": fmt.Sprintf("open ports: %v", open),
-	})
-	enc.Encode(map[string]any{
-		"type": "log", "level": "info",
-		"message": "scanned 65535",
-	})
+
+	logf("scanning %s ports 1..%d (%d workers, %s timeout)",
+		host, len(ports), workers, timeout)
+
+	progress := func(done, total int) {
+		logf("scanned %d/%d ports", done, total)
+	}
+	open := scanPorts(host, ports, workers, timeout, progress)
+
+	for _, p := range open {
+		logf("port %d OPEN", p)
+	}
+	logf("done: %d open of %d scanned on %s", len(open), len(ports), host)
 	enc.Encode(map[string]any{
 		"type":     "done",
 		"exitCode": 0,
-		"result":   map[string]any{"host": host, "open": open, "scanned": 65535},
+		"result":   map[string]any{"host": host, "open": open, "scanned": len(ports)},
 	})
 }
