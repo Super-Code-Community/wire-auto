@@ -1,0 +1,8 @@
+name = "port-scan"
+version = "0.3.0"
+core = "duplex"
+coreApi = 1
+capabilities = []
+link = "stdio"
+language = "go"
+cmd = ["go", "run", "."]

@@ -84,10 +84,15 @@ script → {"type":"log","level":"info","message":"hello from python"}
 script → {"type":"done","exitCode":0}
 ```
 
-## Зарезервированные типы: request / response
+## Интерактивный ввод: prompt / input / response
+
+- `prompt` (скрипт→ядро) — запрос строки ввода у человека; ответ приходит как
+  `response` с тем же `id` и `result.value`. Подробнее — [prompts.md](prompts.md).
+
+## Зарезервированные типы: request / response (будущее)
 
 `request` и `response` зарезервированы для будущей возможности «запрос к железу»
-(hardware bridge). В v1 **не используются**:
+(hardware bridge). В v1 **не используются** для capabilities:
 - Возможности (`capabilities`) в v1 пусты
 - Любой `request` от скрипта при отсутствии разрешённых capabilities → бандл фиксирует **`PROTOCOL_VIOLATION`**
 

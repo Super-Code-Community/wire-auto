@@ -1,20 +1,23 @@
-// Command core — одноразовый прогонщик бандла duplex: встроенный рантайм
-// запускает один скрипт по пути (load core.manifest→handshake→spawn→pump) и
-// печатает исход. Двусторонний канал request/response обслуживает capreg-реестр;
-// множество provides выводится из его ключей.
+// Command core — стриминговый мост бандла duplex: приложение шлёт команды в
+// stdin, бандл стримит события в stdout (JSON Lines). Живёт до exit/EOF,
+// обслуживая запуск за запуском. Рантайм встроен; отдельного admission нет —
+// бандл знает своё ядро из собственного core.manifest. Двусторонний канал
+// request/response обслуживает capreg-реестр; множество provides выводится из
+// его ключей.
 package main
 
 import (
 	"context"
 	"errors"
 	"flag"
-	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"time"
 
+	"wire-auto/cores/duplex/internal/bridge"
 	"wire-auto/cores/duplex/internal/capreg"
+	"wire-auto/cores/duplex/internal/discovery"
 	"wire-auto/cores/duplex/internal/exec"
 	"wire-auto/cores/duplex/internal/handshake"
 	"wire-auto/cores/duplex/internal/manifest"
@@ -32,7 +35,9 @@ func providesFromRegistry(reg map[string]capreg.Handler) []string {
 	return out
 }
 
-func run(coreManifestPath, scriptDir string) (exec.Result, error) {
+// runStreaming выполняет один прогон: load core.manifest → route (только своё
+// ядро) → handshake → spawn → pump, прокидывая ctx и onEvent в exec.Run.
+func runStreaming(ctx context.Context, coreManifestPath, scriptDir string, onEvent func(exec.Event), answers <-chan exec.PromptAnswer) (exec.Result, error) {
 	core, err := manifest.LoadCore(coreManifestPath)
 	if err != nil {
 		return exec.Result{}, err
@@ -62,7 +67,7 @@ func run(coreManifestPath, scriptDir string) (exec.Result, error) {
 		Dir:            scriptDir,
 		Command:        scr.Cmd[0],
 		Args:           scr.Cmd[1:],
-		Env:            []string{"WIRE_SDK_DIR=" + sdkDir},
+		Env:            []string{"WIRE_SDK_DIR=" + sdkDir, "GOWORK=off"},
 		Protocol:       reconciled.Protocol,
 		CoreAPI:        reconciled.CoreAPI,
 		ScriptArgs:     []string{},
@@ -71,37 +76,54 @@ func run(coreManifestPath, scriptDir string) (exec.Result, error) {
 		CancelGrace:    2 * time.Second,
 		Provides:       reconciled.Provides,
 		Registry:       capreg.Default,
+		OnEvent:        onEvent,
+		Answers:        answers,
 	}
-	return exec.Run(context.Background(), spec), nil
+	return exec.Run(ctx, spec), nil
+}
+
+// run — тонкая обёртка без стриминга (используется e2e-тестами).
+func run(coreManifestPath, scriptDir string) (exec.Result, error) {
+	return runStreaming(context.Background(), coreManifestPath, scriptDir, nil, nil)
 }
 
 func main() {
 	coreManifest := flag.String("core", "cores/duplex/core.manifest", "path to this core's manifest")
-	scriptDir := flag.String("script", "", "path to the script directory to run")
+	scriptsDir := flag.String("scripts", "scripts", "path to the scripts directory")
 	flag.Parse()
 
-	if *scriptDir == "" {
-		fmt.Fprintln(os.Stderr, "usage: core -script <dir> [-core manifest]")
-		os.Exit(2)
-	}
-
-	res, err := run(*coreManifest, *scriptDir)
+	core, err := manifest.LoadCore(*coreManifest)
 	if err != nil {
-		fmt.Fprintln(os.Stderr, "error:", err)
 		os.Exit(1)
 	}
 
-	fmt.Printf("Status: %s\n", res.Status)
-	if res.ErrorCode != "" {
-		fmt.Printf("Error:  %s %s\n", res.ErrorCode, res.ErrorMessage)
+	deps := bridge.Deps{
+		List: func() ([]bridge.Script, error) {
+			found, err := discovery.Scan(*scriptsDir)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]bridge.Script, 0, len(found))
+			for _, s := range found {
+				if s.Core != core.Name {
+					continue // чужое ядро — этот бинарь его не запустит
+				}
+				out = append(out, bridge.Script{
+					Name:         s.Name,
+					Dir:          s.Dir,
+					Language:     s.Language,
+					Version:      s.Version,
+					Capabilities: s.Capabilities,
+				})
+			}
+			return out, nil
+		},
+		Run: func(ctx context.Context, dir string, onEvent func(exec.Event), answers <-chan exec.PromptAnswer) (exec.Result, error) {
+			return runStreaming(ctx, *coreManifest, dir, onEvent, answers)
+		},
 	}
-	for _, l := range res.Logs {
-		fmt.Printf("[%s] %s\n", l.Level, l.Message)
-	}
-	if len(res.Result) > 0 {
-		fmt.Printf("Result: %s\n", res.Result)
-	}
-	if res.Status != exec.StatusOK {
+
+	if err := bridge.Serve(os.Stdin, os.Stdout, deps); err != nil {
 		os.Exit(1)
 	}
 }

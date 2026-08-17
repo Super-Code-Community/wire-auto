@@ -16,6 +16,7 @@ const (
 	TypeCancel   = "cancel"
 	TypeRequest  = "request"
 	TypeResponse = "response"
+	TypePrompt   = "prompt"
 )
 
 // MaxLineBytes bounds a single protocol line to guard against adversarial input.

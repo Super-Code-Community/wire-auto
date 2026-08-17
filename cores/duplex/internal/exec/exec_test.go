@@ -66,3 +66,52 @@ func TestPlainV1FlowStillWorks(t *testing.T) {
 		t.Fatalf("logs=%+v", res.Logs)
 	}
 }
+
+func TestPromptRoundTrip(t *testing.T) {
+	spec := v2Spec("testdata/ask")
+	answers := make(chan PromptAnswer, 1)
+	spec.Answers = answers
+	var got Event
+	spec.OnEvent = func(e Event) {
+		if e.Kind == "prompt" {
+			got = e
+			answers <- PromptAnswer{ID: e.ID, Value: "Alice"}
+		}
+	}
+	res := Run(context.Background(), spec)
+	if res.Status != StatusOK {
+		t.Fatalf("status=%s err=%s", res.Status, res.ErrorMessage)
+	}
+	if got.Kind != "prompt" || got.ID != "1" || got.Message != "name?" {
+		t.Fatalf("prompt event=%+v", got)
+	}
+	if len(res.Logs) != 1 || !strings.Contains(res.Logs[0].Message, "hello Alice") {
+		t.Fatalf("logs=%+v", res.Logs)
+	}
+}
+
+func TestPromptBeforeReadyIsViolation(t *testing.T) {
+	res := Run(context.Background(), v2Spec("testdata/ask-early"))
+	if res.Status != StatusProtocolViolation {
+		t.Fatalf("status=%s, want PROTOCOL_VIOLATION", res.Status)
+	}
+}
+
+func TestPromptIgnoresMismatchedAnswerID(t *testing.T) {
+	spec := v2Spec("testdata/ask")
+	answers := make(chan PromptAnswer, 2)
+	spec.Answers = answers
+	spec.OnEvent = func(e Event) {
+		if e.Kind == "prompt" {
+			answers <- PromptAnswer{ID: "99", Value: "wrong"} // не тот id — должен игнорироваться
+			answers <- PromptAnswer{ID: e.ID, Value: "right"}  // верный id
+		}
+	}
+	res := Run(context.Background(), spec)
+	if res.Status != StatusOK {
+		t.Fatalf("status=%s err=%s", res.Status, res.ErrorMessage)
+	}
+	if len(res.Logs) != 1 || !strings.Contains(res.Logs[0].Message, "hello right") {
+		t.Fatalf("logs=%+v, want 'hello right'", res.Logs)
+	}
+}

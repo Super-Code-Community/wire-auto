@@ -1,7 +1,9 @@
 package bridge
 
 import (
+	"bytes"
 	"io"
+	"strings"
 	"testing"
 )
 
@@ -72,5 +74,56 @@ func TestClientRunTerminatesOnError(t *testing.T) {
 	}
 	if term.Type != "error" || term.Message != "nope" {
 		t.Fatalf("ожидали error-терминал, got %+v", term)
+	}
+}
+
+func TestInputCommandEncodes(t *testing.T) {
+	var buf bytes.Buffer
+	if err := encodeCommand(&buf, Command{Type: "input", ID: "1", Value: "Bob"}); err != nil {
+		t.Fatal(err)
+	}
+	got := strings.TrimSpace(buf.String())
+	want := `{"type":"input","id":"1","value":"Bob"}`
+	if got != want {
+		t.Fatalf("got %s want %s", got, want)
+	}
+}
+
+func TestPromptEventDecodes(t *testing.T) {
+	d := newEventDecoder(strings.NewReader(`{"type":"prompt","id":"1","message":"name?"}` + "\n"))
+	e, err := d.next()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.Type != "prompt" || e.ID != "1" || e.Message != "name?" {
+		t.Fatalf("prompt event=%+v", e)
+	}
+}
+
+func TestClientRunHandlesPrompt(t *testing.T) {
+	ft := &fakeTransport{events: []Event{
+		{Type: "prompt", ID: "1", Message: "name?"},
+		{Type: "result", Status: "OK"},
+	}}
+	c := NewClient(ft)
+	term, err := c.Run("scripts/x", func(e Event) {
+		if e.Type == "prompt" {
+			_ = c.SendInput(e.ID, "Bob")
+		}
+	})
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+	if term.Type != "result" {
+		t.Fatalf("терминал неверен: %+v", term)
+	}
+	var found bool
+	for _, s := range ft.sent {
+		if s.Type == "input" && s.ID == "1" && s.Value == "Bob" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("input-команда не отправлена: %+v", ft.sent)
 	}
 }

@@ -14,6 +14,8 @@
 | [protocol.md](protocol.md) | JSON Lines, набор сообщений, диалог hello→ready→log→done, правило «stdout — канал протокола», зарезервированные request/response |
 | [transports-and-language-independence.md](transports-and-language-independence.md) | Концепт «связь» (link), почему ядро языко-независимо, WIRE_SDK_DIR, тонкий шим |
 | [cores.md](cores.md) | Ядра-бандлы: self-contained Go-модули; два рукопожатия; реестр возможностей; UNKNOWN_CORE vs CORE_INCOMPATIBLE; «пересаживание» |
+| [capabilities.md](capabilities.md) | Реестр возможностей ядра: стартовый пак env/net/sys, params/result каждой capability, политика таймаутов, ограничение последовательного диспатча, пример прозвона портов |
+| [prompts.md](prompts.md) | Интерактивный ввод: событие prompt / команда input, поток через обе границы, политика блокировки, пример ask-name |
 | [lifecycle.md](lifecycle.md) | Полный цикл исполнения (discover→route→handshake→spawn→hello→pump→result), таймауты, cancel+grace, статусы результата |
 | [writing-a-script.md](writing-a-script.md) | Пошаговое создание скрипта: папка, script.manifest, main.py с шимом, запуск; типичные ошибки |
 | [running.md](running.md) | Как запускать и тестировать: deview, пайп JSON-команд, флаги core, команды test/build/vet |

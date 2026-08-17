@@ -146,3 +146,52 @@ except Exception as e:
     s.log(f"ошибка: {e}", level="error")
     s.done(1)
 ```
+
+## Вызов возможностей ядра
+
+Скрипт дёргает примитив ядра сообщением `request` и читает `response`:
+
+```python
+send({"type": "request", "id": "1", "capability": "net.tcp.connect",
+      "params": {"host": "127.0.0.1", "port": 80, "timeout_ms": 500}})
+resp = recv()
+status = resp.get("result", {}).get("status")  # open | closed | filtered
+```
+
+Возможность должна быть объявлена в `script.capabilities`, иначе придёт
+`response.code = "CAPABILITY_DENIED"`. Полный список — в [capabilities.md](capabilities.md).
+
+## Скрипт на Go («толстый» скрипт)
+
+Скрипт может быть на компилируемом языке. Пример — `scripts/examples/port-scan`:
+самостоятельный Go-модуль (`go.mod` на stdlib, без внешних зависимостей),
+который тяжёлую работу делает сам, а не через ядерные возможности.
+
+Манифест:
+
+```toml
+name = "port-scan"
+version = "0.3.0"
+core = "duplex"
+coreApi = 1
+capabilities = []          # capability не нужны — скрупулёзная работа своя
+link = "stdio"
+language = "go"
+cmd = ["go", "run", "."]   # запуск модуля из папки скрипта
+```
+
+**Изоляция через `GOWORK=off`.** При активном корневом `go.work` команда
+`go run .` в папке скрипта (модуль не входит в workspace) падает. Поэтому ядро
+при спавне любого скрипта выставляет `GOWORK=off` — Go-скрипт всегда герметичен
+(изолирован от dev-workspace). Для Python/Node это безвредно: `GOWORK` — Go-
+переменная, ими игнорируется. Env в манифесте задавать не нужно.
+
+**Концепт «толстого» скрипта.** port-scan сам конкурентно прозванивает все
+65535 портов через `net.DialTimeout` в горутинах (worker-pool), не используя
+ядерные `net.*`. Так обходится последовательный синхронный диспатч `exec.Run`
+(65535 портов через per-port capability не влезли бы в `RunTimeout`) — и видно,
+зачем вообще может понадобиться скрипт на компилируемом языке.
+
+**Интерактивный адрес.** После `ready` скрипт спрашивает адрес для прозвона через
+`prompt` (см. [prompts.md](prompts.md)) и ждёт `response`; пустой ответ → скан
+`127.0.0.1`. Prompt — не capability, объявлять в манифесте не нужно.

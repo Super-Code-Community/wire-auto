@@ -46,6 +46,14 @@ type Spec struct {
 	// v2: авторизованные capability и реестр обработчиков.
 	Provides []string
 	Registry map[string]capreg.Handler
+	// prompt: канал ответов клиента на интерактивные запросы скрипта.
+	Answers <-chan PromptAnswer
+}
+
+// PromptAnswer — ответ клиента на prompt скрипта (коррелируется по ID).
+type PromptAnswer struct {
+	ID    string
+	Value string
 }
 
 type Result struct {
@@ -152,6 +160,8 @@ func Run(ctx context.Context, spec Spec) Result {
 	res := Result{Logs: []LogLine{}}
 	gotReady := false
 	deadline := time.After(spec.StartupTimeout)
+	var answers <-chan PromptAnswer // nil, пока не ждём ответ на prompt
+	var promptID string
 
 	kill := func(status, code, msg string) Result {
 		_ = cmd.Process.Kill()
@@ -200,6 +210,13 @@ loop:
 				}
 			}
 			return kill(StatusCancelled, StatusCancelled, "cancelled by client")
+		case ans := <-answers:
+			if ans.ID != promptID {
+				continue // ответ не тому prompt (клиент ошибся) — игнорируем, ждём верный
+			}
+			result, _ := json.Marshal(map[string]string{"value": ans.Value})
+			_ = protocol.Encode(stdin, protocol.Message{Type: protocol.TypeResponse, ID: promptID, Result: result})
+			answers = nil // ответ доставлен — перестаём ждать
 		case ev := <-ch:
 			if ev.err != nil {
 				if errors.Is(ev.err, io.EOF) {
@@ -223,6 +240,16 @@ loop:
 					return kill(StatusProtocolViolation, StatusProtocolViolation, "request before ready")
 				}
 				_ = protocol.Encode(stdin, dispatchRequest(spec, ev.msg))
+			case protocol.TypePrompt:
+				if spec.Protocol < 2 {
+					return kill(StatusProtocolViolation, StatusProtocolViolation, "prompt not allowed on protocol 1")
+				}
+				if !gotReady {
+					return kill(StatusProtocolViolation, StatusProtocolViolation, "prompt before ready")
+				}
+				emit(Event{Kind: "prompt", ID: ev.msg.ID, Message: ev.msg.Message})
+				promptID = ev.msg.ID
+				answers = spec.Answers // начинаем ждать ответ клиента
 			case protocol.TypeDone:
 				code := 0
 				if ev.msg.ExitCode != nil {
