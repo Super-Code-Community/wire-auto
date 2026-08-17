@@ -27,6 +27,9 @@ bin/
 *.test
 *.out
 vendor/
+# go.work is a local, per-machine dev convenience — never committed (see CLAUDE.md)
+go.work
+go.work.sum
 
 # ---- Rust (if any bridge uses it) ----
 target/
@@ -47,3 +50,4 @@ venv/
 *.log
 tmp/
 .cache/
+

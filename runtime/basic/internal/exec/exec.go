@@ -3,6 +3,8 @@
 package exec
 
 import (
+	"context"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
@@ -19,6 +21,7 @@ const (
 	StatusStartupTimeout    = "STARTUP_TIMEOUT"
 	StatusRunTimeout        = "RUN_TIMEOUT"
 	StatusCrashed           = "CRASHED"
+	StatusCancelled         = "CANCELLED"
 )
 
 type LogLine struct {
@@ -38,6 +41,8 @@ type Spec struct {
 	RunTimeout     time.Duration
 	// CancelGrace is how long to wait after sending a cancel message before hard-killing the child process.
 	CancelGrace time.Duration
+	// OnEvent, если задан, получает ready/log по ходу прогона (для стриминга наружу).
+	OnEvent func(Event)
 }
 
 type Result struct {
@@ -46,6 +51,7 @@ type Result struct {
 	Logs         []LogLine
 	ErrorCode    string
 	ErrorMessage string
+	Result       json.RawMessage
 }
 
 // msgOrErr — одно прочитанное сообщение либо ошибка чтения потока.
@@ -54,7 +60,13 @@ type msgOrErr struct {
 	err error
 }
 
-func Run(spec Spec) Result {
+func Run(ctx context.Context, spec Spec) Result {
+	emit := func(e Event) {
+		if spec.OnEvent != nil {
+			spec.OnEvent(e)
+		}
+	}
+
 	cmd := exec.Command(spec.Command, spec.Args...)
 	cmd.Dir = spec.Dir
 	if len(spec.Env) > 0 {
@@ -141,6 +153,24 @@ loop:
 				}
 			}
 			return kill(StatusRunTimeout, StatusRunTimeout, "")
+		case <-ctx.Done():
+			// Внешняя отмена клиента: тот же путь cancel→grace→kill, статус CANCELLED.
+			_ = protocol.Encode(stdin, protocol.Message{Type: protocol.TypeCancel})
+			if spec.CancelGrace > 0 {
+				grace := time.After(spec.CancelGrace)
+			graceCancel:
+				for {
+					select {
+					case ev := <-ch:
+						if ev.err != nil {
+							break graceCancel
+						}
+					case <-grace:
+						break graceCancel
+					}
+				}
+			}
+			return kill(StatusCancelled, StatusCancelled, "cancelled by client")
 		case ev := <-ch:
 			if ev.err != nil {
 				if errors.Is(ev.err, io.EOF) {
@@ -153,14 +183,17 @@ loop:
 			case protocol.TypeReady:
 				gotReady = true
 				deadline = time.After(spec.RunTimeout) // переключаемся на таймаут выполнения
+				emit(Event{Kind: "ready"})
 			case protocol.TypeLog:
 				res.Logs = append(res.Logs, LogLine{Level: ev.msg.Level, Message: ev.msg.Message})
+				emit(Event{Kind: "log", Level: ev.msg.Level, Message: ev.msg.Message})
 			case protocol.TypeDone:
 				code := 0
 				if ev.msg.ExitCode != nil {
 					code = *ev.msg.ExitCode
 				}
 				res.ExitCode = code
+				res.Result = ev.msg.Result
 				_ = cmd.Wait()
 				if code == 0 {
 					res.Status = StatusOK

@@ -7,6 +7,12 @@
 - Finishing a task is NOT permission to commit. Wait for an explicit instruction every time.
 - This rule is also enforced mechanically: git write operations are set to always prompt in `.claude/settings.json`.
 
+## Go workspace discipline (hard rule)
+
+- **No committed `go.work` in the repo root.** `go.work` (and `go.work.sum`) is a purely local, per-machine dev convenience and is gitignored. Never `git add`/commit it, and never treat it as a tracked repo artifact.
+- **Every module builds independently without it.** Each Go module (`runtime/<model>/`, `apps/<client>/`) must build, vet, and test on its own via `cd <module> && go build ./... && go vet ./... && go test ./...`. Nothing in the committed repo may depend on a root `go.work`.
+- A developer who wants root-level `go build/test ./...` to span modules may create a local `go.work` (`go work init ./runtime/basic ./apps/deview`), but it stays local.
+
 ## Documentation discipline (guide/)
 
 The project principle is **nothing monolithic** — this applies to docs too.

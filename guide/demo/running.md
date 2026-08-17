@@ -2,62 +2,38 @@
 
 Все команды запускаются из корня репозитория `wire-auto/` (если не оговорено иное).
 
-## Запуск скрипта
+## Запуск скрипта через deview
+
+`wire` — долгоживущий мост (stdin → команды, stdout → события); напрямую руками
+его не запускают. Для интерактивного запуска скриптов используйте `deview`:
 
 ```bash
-go run ./runtime/basic/cmd/wire ./scripts/examples/hello
+go run ./apps/deview/cmd/deview
 ```
 
-CLI принимает необязательные флаги и один позиционный аргумент — путь к папке скрипта:
+`deview` сам поднимает мост, показывает нумерованное меню и рисует живой ход
+выполнения. Подробнее — в [apps-deview.md](apps-deview.md).
 
-```
-wire [--runtime <путь>] [--cores <путь>] <script-dir>
-```
+### Запуск через пайп (отладка / скрипты)
 
-| Флаг        | По умолчанию                        | Назначение                             |
-|-------------|-------------------------------------|----------------------------------------|
-| `--runtime` | `runtime/basic/runtime.manifest`    | путь к манифесту рантайма              |
-| `--cores`   | `cores`                             | путь к директории с ядрами             |
+Можно передавать команды напрямую, подавая JSON Lines в stdin:
 
-Примеры:
 ```bash
-# запуск с явными путями (эквивалентно умолчаниям)
-go run ./runtime/basic/cmd/wire \
-    --runtime runtime/basic/runtime.manifest \
-    --cores cores \
-    ./scripts/examples/hello
-
-# запуск своего скрипта
-go run ./runtime/basic/cmd/wire ./scripts/examples/my-script
+printf '%s\n' '{"type":"list"}' '{"type":"exit"}' | go run ./runtime/basic/cmd/wire
 ```
 
-## Результат и код выхода
+Мост читает команды до `exit` или EOF и закрывается. Это удобно для автоматизации
+и диагностики; для повседневной работы предпочтительнее `deview`.
 
-Рантайм печатает JSON в stdout и завершается:
-- код выхода `0` — `Status` = `OK`
-- код выхода `1` — любой другой статус
+### Флаги wire
 
-Пример успешного результата:
-```json
-{
-  "Status": "OK",
-  "Logs": [
-    {"level": "info", "message": "hello from python"}
-  ]
-}
-```
+| Флаг        | По умолчанию                     | Назначение                       |
+|-------------|----------------------------------|----------------------------------|
+| `--runtime` | `runtime/basic/runtime.manifest` | путь к манифесту рантайма        |
+| `--cores`   | `cores`                          | путь к директории с ядрами       |
+| `--scripts` | `scripts`                        | корень поиска скриптов           |
 
-Пример при ошибке рукопожатия:
-```json
-{
-  "Status": "HANDSHAKE_FAILED",
-  "ErrorCode": "CORE_API_MISMATCH",
-  "ErrorMessage": "script coreApi 2, core coreApi 1",
-  "Logs": []
-}
-```
-
-Полный список статусов — в [lifecycle.md](lifecycle.md).
+Протокол команд/событий — в [app-runtime-bridge.md](app-runtime-bridge.md).
 
 ## Go-тесты рантайма
 

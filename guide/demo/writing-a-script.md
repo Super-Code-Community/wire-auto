@@ -59,18 +59,20 @@ if __name__ == "__main__":
 
 ### Шаг 4. Запустить
 
+Скрипт запускается через клиент — консольный `deview`:
+
 ```bash
-go run ./runtime/basic/cmd/wire ./scripts/examples/my-script
+go run ./apps/deview/cmd/deview
 ```
 
-При успехе вывод будет примерно таким:
+Обнаружение скриптов рекурсивно: скрипт, положенный под
+`scripts/examples/<имя>/` или `scripts/community/<имя>/`, автоматически появится
+в нумерованном меню. Выберите его номер — deview покажет живой лог и итог.
+Подробнее — в [apps-deview.md](apps-deview.md) и [running.md](running.md).
+
+При успехе итоговое событие будет примерно таким:
 ```json
-{
-  "Status": "OK",
-  "Logs": [
-    {"level": "info", "message": "привет из моего скрипта"}
-  ]
-}
+{"type":"result","status":"OK","exitCode":0}
 ```
 
 ## Типичные ошибки и их причины

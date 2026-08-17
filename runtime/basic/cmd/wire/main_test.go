@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"wire-auto/runtime/basic/internal/bridge"
+	"wire-auto/runtime/basic/internal/exec"
 )
 
 // repoRoot: .../runtime/basic/cmd/wire → поднимаемся на четыре уровня.
@@ -60,5 +65,32 @@ func TestEndToEndUnknownCore(t *testing.T) {
 	}
 	if res.Status != "HANDSHAKE_FAILED" || res.ErrorCode != "UNKNOWN_CORE" {
 		t.Fatalf("status=%s code=%s", res.Status, res.ErrorCode)
+	}
+}
+
+func TestBridgeRunsHelloEndToEnd(t *testing.T) {
+	root := repoRoot(t)
+	var got exec.Result
+	deps := bridge.Deps{
+		List: func() ([]bridge.Script, error) { return nil, nil },
+		Run: func(ctx context.Context, dir string, onEvent func(exec.Event)) (exec.Result, error) {
+			return runStreaming(ctx,
+				filepath.Join(root, "runtime", "basic", "runtime.manifest"),
+				filepath.Join(root, "cores"),
+				dir, onEvent)
+		},
+	}
+	in := strings.NewReader(
+		`{"type":"run","dir":"` + filepath.ToSlash(filepath.Join(root, "scripts", "examples", "hello")) + `"}` + "\n" +
+			`{"type":"exit"}` + "\n")
+	var out strings.Builder
+	if err := bridge.Serve(in, &out, deps); err != nil {
+		t.Fatalf("Serve: %v", err)
+	}
+	_ = got
+	if !strings.Contains(out.String(), `"type":"ready"`) ||
+		!strings.Contains(out.String(), "hello from python") ||
+		!strings.Contains(out.String(), `"status":"OK"`) {
+		t.Fatalf("мост не отдал ожидаемые события:\n%s", out.String())
 	}
 }

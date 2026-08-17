@@ -1,6 +1,7 @@
 package exec
 
 import (
+	"context"
 	"testing"
 	"time"
 )
@@ -27,7 +28,7 @@ func baseSpec(code string) Spec {
 }
 
 func TestRunOK(t *testing.T) {
-	res := Run(baseSpec(goodScript))
+	res := Run(context.Background(), baseSpec(goodScript))
 	if res.Status != StatusOK {
 		t.Fatalf("status=%s err=%s", res.Status, res.ErrorMessage)
 	}
@@ -44,7 +45,7 @@ def send(o): sys.stdout.write(json.dumps(o)+"\n"); sys.stdout.flush()
 send({"type":"ready"})
 send({"type":"done","exitCode":3})
 `
-	res := Run(baseSpec(code))
+	res := Run(context.Background(), baseSpec(code))
 	if res.Status != StatusScriptError || res.ExitCode != 3 {
 		t.Fatalf("got status=%s exit=%d", res.Status, res.ExitCode)
 	}
@@ -58,7 +59,7 @@ def send(o): sys.stdout.write(json.dumps(o)+"\n"); sys.stdout.flush()
 send({"type":"ready"})
 send({"type":"request","capability":"serial"})
 `
-	res := Run(baseSpec(code))
+	res := Run(context.Background(), baseSpec(code))
 	if res.Status != StatusProtocolViolation {
 		t.Fatalf("got status=%s", res.Status)
 	}
@@ -75,7 +76,7 @@ time.sleep(30)
 	spec := baseSpec(code)
 	spec.RunTimeout = 500 * time.Millisecond
 	spec.CancelGrace = 200 * time.Millisecond
-	res := Run(spec)
+	res := Run(context.Background(), spec)
 	if res.Status != StatusRunTimeout {
 		t.Fatalf("got status=%s", res.Status)
 	}
@@ -99,7 +100,7 @@ send({"type":"done","exitCode":0})
 	spec.CancelGrace = 2 * time.Second
 
 	start := time.Now()
-	res := Run(spec)
+	res := Run(context.Background(), spec)
 	elapsed := time.Since(start)
 
 	if res.Status != StatusRunTimeout {
@@ -119,7 +120,7 @@ time.sleep(30)
 `
 	spec := baseSpec(code)
 	spec.StartupTimeout = 500 * time.Millisecond
-	res := Run(spec)
+	res := Run(context.Background(), spec)
 	if res.Status != StatusStartupTimeout {
 		t.Fatalf("got status=%s", res.Status)
 	}
@@ -133,8 +134,24 @@ def send(o): sys.stdout.write(json.dumps(o)+"\n"); sys.stdout.flush()
 send({"type":"ready"})
 sys.exit(0)
 `
-	res := Run(baseSpec(code))
+	res := Run(context.Background(), baseSpec(code))
 	if res.Status != StatusCrashed {
 		t.Fatalf("got status=%s", res.Status)
 	}
+}
+
+func TestRunAcceptsContextAndSink(t *testing.T) {
+	// Компиляционный контракт: Run принимает ctx, Spec имеет OnEvent,
+	// Result имеет поле Result. Тест ловит регресс сигнатур.
+	var got []Event
+	spec := Spec{
+		Command:        "nonexistent-binary-xyz",
+		StartupTimeout: 10 * time.Millisecond,
+		OnEvent:        func(e Event) { got = append(got, e) },
+	}
+	res := Run(context.Background(), spec)
+	if res.Status != StatusCrashed {
+		t.Fatalf("ожидали CRASHED для отсутствующего бинарника, got %s", res.Status)
+	}
+	_ = got // сток может быть пустым: процесс не стартовал
 }

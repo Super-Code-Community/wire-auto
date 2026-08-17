@@ -1,7 +1,0 @@
-// Dev-time workspace pointer — not a module, introduces no coupling.
-// Each listed module stays independently buildable; this only lets
-// `go build/test ./...` and `go run` work from the repo root.
-// Add future Go modules (e.g. ./cores/regular, ./packages/*) here as they appear.
-go 1.26.4
-
-use ./runtime/basic
